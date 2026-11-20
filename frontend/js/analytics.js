@@ -23,8 +23,12 @@ async function init() {
   const y = new Date().getFullYear();
   $("#yearSel").innerHTML = [y, y - 1, y - 2].map((v) => option(v, v, v === y)).join("");
   $("#yearSel").addEventListener("change", loadAll);
-  $("#cropSel").innerHTML = crops.map((c) => option(c.key, `${c.icon} ${c.name}`)).join("");
-  $("#kindSel").addEventListener("change", fillCats); fillCats();
+  $("#cropSel").innerHTML = crops.map((c) => option(c.key || c.name, `${c.icon || '🌾'} ${c.name}`)).join("");
+  
+  // Ensure kindSel changes trigger category population properly
+  $("#kindSel").addEventListener("change", fillCats); 
+  fillCats();
+
   $("#txForm").elements.date.value = fmt.today();
   $("#hvForm").elements.date.value = fmt.today();
   $$(".tabs button").forEach((b) => b.addEventListener("click", () => {
@@ -38,23 +42,49 @@ async function init() {
 }
 
 function fillCats() {
-  const kind = $("#kindSel").value;
-  $("#catSel").innerHTML = cats[kind].map((c) => option(c, c[0].toUpperCase() + c.slice(1))).join("");
+  const kind = $("#kindSel").value.toLowerCase(); // 'expense' or 'income'
+  const list = cats[kind] || cats.common_categories || cats.expense || ["Crop Sales", "Fertilizer", "Seeds", "Labor"];
+  $("#catSel").innerHTML = list.map((c) => option(c, typeof c === 'string' ? c[0].toUpperCase() + c.slice(1) : c)).join("");
 }
 
 async function saveTx(e) {
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target).entries());
-  f.farm_id = farm.id; f.amount = Number(f.amount);
-  try { await api("/api/analytics/transactions", { method: "POST", body: f }); notice($("#msg"), "Transaction saved.", "ok"); e.target.elements.amount.value = ""; loadAll(); }
+  const formData = new FormData(e.target);
+  const f = {
+    farm_id: farm.id,
+    kind: formData.get("kind"),
+    category: formData.get("category"),
+    amount: Number(formData.get("amount")),
+    description: formData.get("description"),
+    date: formData.get("date") || fmt.today()
+  };
+  try { 
+    // Pass raw object 'f' directly (api helper handles serialization)
+    await api("/api/analytics/transactions", { method: "POST", body: f }); 
+    notice($("#msg"), "Transaction saved.", "ok"); 
+    e.target.elements.amount.value = ""; 
+    e.target.elements.description.value = "";
+    loadAll(); 
+  }
   catch (err) { notice($("#msg"), err.message); }
 }
 
 async function saveHv(e) {
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target).entries());
-  f.farm_id = farm.id; f.quantity_kg = Number(f.quantity_kg);
-  try { await api("/api/analytics/harvests", { method: "POST", body: f }); notice($("#msg"), "Harvest saved.", "ok"); e.target.elements.quantity_kg.value = ""; loadAll(); }
+  const formData = new FormData(e.target);
+  const f = {
+    farm_id: farm.id,
+    crop_name: formData.get("crop_name"),
+    quantity_kg: Number(formData.get("quantity_kg")),
+    harvest_date: formData.get("date") || fmt.today()
+  };
+  try { 
+    // Pass raw object 'f' directly
+    await api("/api/analytics/harvests", { method: "POST", body: f }); 
+    notice($("#msg"), "Harvest saved.", "ok"); 
+    e.target.elements.quantity_kg.value = ""; 
+    loadAll(); 
+  }
   catch (err) { notice($("#msg"), err.message); }
 }
 

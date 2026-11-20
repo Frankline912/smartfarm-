@@ -2,7 +2,7 @@
 
 // When the frontend is deployed separately (Vercel/Netlify), set this to the backend URL,
 // e.g. "https://smartfarm-api.onrender.com". Empty string = same origin.
-const API_BASE = window.API_BASE || "";
+const API_BASE = "http://127.0.0.1:8000";
 
 const Auth = {
   token() { return localStorage.getItem("sf_token"); },

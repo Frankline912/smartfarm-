@@ -27,32 +27,35 @@ async function loadWeather() {
   const recs = $("#weatherRecs");
   try {
     const w = await api(`/api/weather/farm/${farm.id}`);
-    const c = w.current;
-    $("#weatherPlace").textContent = `${farm.location_name} · updated ${new Date(c.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const c = w.current || w; // Safe fallback if 'current' isn't nested
+
+    $("#weatherPlace").textContent = `${farm.location_name || farm.location || "Farm"} · updated ${c.time ? new Date(c.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"}`;
     box.innerHTML = `
       <div class="weather-now">
-        <div class="big">${c.weather.icon}</div>
+        <div class="big">${c.weather?.icon || "☀️"}</div>
         <div>
-          <div class="temp">${Math.round(c.temperature)}°C</div>
-          <div class="muted">${esc(c.weather.label)}</div>
+          <div class="temp">${Math.round(c.temperature || 0)}°C</div>
+          <div class="muted">${esc(c.weather?.label || "Clear")}</div>
         </div>
       </div>
       <div class="weather-meta">
         <span>🌧 ${c.rain_probability_24h ?? 0}% chance of rain (24h)</span>
-        <span>💧 Humidity ${c.humidity}%</span>
-        <span>💨 Wind ${Math.round(c.wind_kmh)} km/h</span>
-        <span>☔ Last 3 days: ${w.past_rain_mm_3d} mm</span>
+        <span>💧 Humidity ${c.humidity ?? 0}%</span>
+        <span>💨 Wind ${Math.round(c.wind_kmh || 0)} km/h</span>
+        <span>☔ Last 3 days: ${w.past_rain_mm_3d ?? 0} mm</span>
       </div>
       <div class="forecast">
-        ${w.forecast.map((d, i) => `
+        ${(w.forecast || []).map((d, i) => `
           <div class="day">
             <div>${i === 0 ? "Today" : fmt.dayName(d.date)}</div>
-            <div class="ico">${d.weather.icon}</div>
+            <div class="ico">${d.weather?.icon || "☀️"}</div>
             <div class="t">${Math.round(d.temp_max)}° <span class="muted">${Math.round(d.temp_min)}°</span></div>
             <div class="r">${d.rain_probability ?? 0}%</div>
           </div>`).join("")}
       </div>`;
-    recs.innerHTML = w.recommendations.map(alertHtml).join("");
+    if (recs && w.recommendations) {
+      recs.innerHTML = w.recommendations.map(alertHtml).join("");
+    }
   } catch (e) {
     box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }
@@ -128,15 +131,16 @@ async function loadMarket() {
 async function loadPerformance() {
   const el = $("#performance");
   try {
-    const s = await api(`/api/analytics/summary?farm_id=${farm.id}`);
+    const year = new Date().getFullYear();
+    const s = await api(`/api/analytics/summary?farm_id=${farm.id}&year=${year}`);
     el.innerHTML = `
       <div class="grid cols-3" style="gap:10px">
         <div class="stat"><span class="label">Revenue</span><span class="value sm">${fmt.money(s.revenue)}</span></div>
         <div class="stat"><span class="label">Expenses</span><span class="value sm">${fmt.money(s.expenses)}</span></div>
         <div class="stat"><span class="label">Profit</span><span class="value sm" style="color:${s.profit >= 0 ? "var(--success)" : "var(--danger)"}">${fmt.money(s.profit)}</span></div>
       </div>
-      <h3 style="margin-top:16px">Harvest ${s.year}</h3>
-      ${s.harvest_by_crop.length ? `<table>${s.harvest_by_crop.slice(0, 4).map((h) => `<tr><td>${h.icon} ${esc(h.crop_name)}</td><td class="num">${fmt.num(h.quantity_kg)} kg</td></tr>`).join("")}</table>` : `<p class="tiny">No harvests recorded yet.</p>`}`;
+      <h3 style="margin-top:16px">Harvest ${s.year || year}</h3>
+      ${s.harvest_by_crop && s.harvest_by_crop.length ? `<table>${s.harvest_by_crop.slice(0, 4).map((h) => `<tr><td>${h.icon} ${esc(h.crop_name)}</td><td class="num">${fmt.num(h.quantity_kg)} kg</td></tr>`).join("")}</table>` : `<p class="tiny">No harvests recorded yet.</p>`}`;
   } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
